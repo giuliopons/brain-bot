@@ -1,0 +1,23 @@
+[Unit]
+Description=brain-bot: cattura Telegram -> inbox del second brain
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=brain
+Group=brain
+EnvironmentFile=/etc/brain-bot.env
+ExecStart=/usr/bin/python3 -u /home/brain/bot/bot.py
+Restart=always
+RestartSec=10
+
+# Isolamento: il bot vede e scrive solo /home/brain
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindPaths=/home/brain
+PrivateTmp=true
+MemoryMax=150M
+
+[Install]
+WantedBy=multi-user.target
