@@ -311,7 +311,8 @@ def handle(msg: dict) -> None:
 
     first_line = (text.splitlines() or ["allegato"])[0][:60]
     commit_and_push(f"inbox: {first_line}")
-    reply(chat_id, f"✅ {note.relative_to(VAULT)}", msg_id)
+    # no ".md" in the reply: Telegram would turn the file name into a link (.md = Moldova TLD)
+    reply(chat_id, f"✅ {note.relative_to(VAULT).with_suffix('')}", msg_id)
     log.info("salvato %s", note.relative_to(VAULT))
 
 

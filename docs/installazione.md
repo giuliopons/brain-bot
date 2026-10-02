@@ -176,7 +176,7 @@ Da adesso il bot risponde solo a te, e solo in chat privata.
 
 ## 8. Prova
 
-1. Manda al bot `prova dal telefono`. Risponde `✅ inbox/2026-10-02-153012.md`.
+1. Manda al bot `prova dal telefono`. Risponde `✅ inbox/2026-10-02-153012`: è il nome della nota, senza `.md`.
 2. Sul PC fai `git pull`: la nota è in `inbox/`.
 3. Manda `/cerca prova`: il bot ti mostra la nota appena creata.
 

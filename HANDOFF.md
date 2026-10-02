@@ -14,10 +14,10 @@ Implemented in `bot.py` (`search()`, `parse_command()`), tests in `tests/test_bo
 - Only the first line of the message is used as the term (with `-F` a newline would become a second pattern).
 - `/help@botusername` now works too.
 
-Still to do by hand:
-- deploy (`sudo bash ~/brain-bot/setup-bot.sh`) and try it from Telegram;
-- optional: @BotFather → `/setcommands` → `cerca - cerca nel second brain`;
-- optional: the ✅ capture reply still shows `inbox/….md`, which Telegram links. Strip `.md` there too if it bothers.
+Deployed and working on the server.
+The ✅ capture reply now also omits `.md`.
+
+Optional follow-up: @BotFather → `/setcommands` → `cerca - cerca nel second brain` (owner will do it).
 
 The original spec is kept below for reference.
 

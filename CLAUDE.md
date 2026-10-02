@@ -13,7 +13,7 @@ User docs: `README.md` and `docs/installazione.md` (Italian).
   Photos/documents/videos are saved in `inbox/attachments/` and embedded with `![[file]]`. Album photos go into one note.
 - After writing: `git pull --rebase` → `git add -A inbox` → `git commit` → `git push origin HEAD:main`, retried up to 3 times.
 - The push lands in the bare repo `/home/brain/brain.git`, whose `post-receive` hook mirrors to GitHub in the background.
-- Replies ✅ with the file path, or ❌ with the error.
+- Replies ✅ with the note path without `.md` (see below), or ❌ with the error.
 - **`/cerca <parola>`** searches the vault, read-only: `git grep -z -i -F` on the bare repo's `main` (`*.md` only), never on the clone.
   At most 10 files × 2 lines, lines cut at 150 chars, reply capped at 4096 UTF-16 units. Term < 3 chars refused; only the first line of the message is used.
   File names are shown **without `.md`**: Telegram auto-links `name.md` (Moldova TLD) even in plain text.

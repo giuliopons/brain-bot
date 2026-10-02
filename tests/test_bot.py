@@ -48,6 +48,10 @@ class CercaTest(unittest.TestCase):
         run("git", "add", ".", cwd=work)
         run("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init", cwd=work)
         run("git", "clone", "-q", "--bare", str(work), str(tmp / "brain.git"), cwd=tmp)
+        # the bot's working clone, used by the capture test
+        run("git", "clone", "-q", str(tmp / "brain.git"), str(tmp / "vault"), cwd=tmp)
+        run("git", "config", "user.name", "brain-bot", cwd=tmp / "vault")
+        run("git", "config", "user.email", "bot@test", cwd=tmp / "vault")
 
         os.environ.update(BRAIN_BOT_TOKEN="x", BRAIN_BOT_ALLOWED_USER_ID=str(USER),
                           BRAIN_VAULT=str(tmp / "vault"), BRAIN_BARE_REPO=str(tmp / "brain.git"))
@@ -132,6 +136,12 @@ class CercaTest(unittest.TestCase):
 
     def test_utente_non_autorizzato(self):
         self.assertEqual(self.ask("/cerca mbsync", user=7), [])
+
+    def test_cattura_risposta_senza_md(self):
+        r = self.one("nota catturata nel test")
+        self.assertRegex(r, r"^✅ inbox/\d{4}-\d{2}-\d{2}-\d{6}$")
+        note = Path(self.tmp.name) / "vault" / (r[2:] + ".md")
+        self.assertIn("nota catturata nel test", note.read_text(encoding="utf-8"))
 
     def test_reply_senza_anteprime(self):
         calls = []

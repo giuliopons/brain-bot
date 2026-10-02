@@ -37,7 +37,7 @@ source: telegram
 Il testo che hai mandato
 ```
 
-Il bot risponde ✅ con il nome della nota, o ❌ con l'errore.
+Il bot risponde ✅ con il nome della nota (senza `.md`, così Telegram non lo trasforma in un link), o ❌ con l'errore.
 
 ## Il bot e il vault: due repo separate
 
