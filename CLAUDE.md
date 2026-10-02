@@ -17,6 +17,10 @@ User docs: `README.md` and `docs/installazione.md` (Italian).
 - **`/cerca <parola>`** searches the vault, read-only: `git grep -z -i -F` on the bare repo's `main` (`*.md` only), never on the clone.
   At most 10 files × 2 lines, lines cut at 150 chars, reply capped at 4096 UTF-16 units. Term < 3 chars refused; only the first line of the message is used.
   File names are shown **without `.md`**: Telegram auto-links `name.md` (Moldova TLD) even in plain text.
+- **Note titles (optional, `titles.py`)**: with `ANTHROPIC_API_KEY` set, each new note gets a title from Claude Haiku (`claude-haiku-4-5`, raw HTTP via urllib — no SDK, stdlib only).
+  Input: text/caption (+ document file name), the `<title>` of the first linked page (first 64 KB, 5 s), and the photo (vision).
+  Output: `title:` in the frontmatter, slug in the file name (`inbox/YYYY-MM-DD-HHMMSS-<slug>.md`, slug `[a-z0-9-]`, ≤ 60 chars), commit message `inbox: <title>`.
+  Album: only the first message is titled. Every failure (no key, timeout, HTTP error, odd reply) → `None` → date-only name, exactly as before. `titles.py` never raises.
 - All replies are plain text (no `parse_mode`) with link previews disabled (`link_preview_options`).
 - Commands also accept the `/cmd@botusername` form (`parse_command()`).
 
@@ -26,7 +30,8 @@ This repo (cloned anywhere on the server, e.g. `~/brain-bot`) is the **source**.
 
 | File | Purpose |
 |---|---|
-| `bot.py` | the bot (single file) |
+| `bot.py` | the bot |
+| `titles.py` | optional note titles from Claude Haiku, imported by `bot.py` |
 | `brain-bot.service` | systemd unit |
 | `setup-server.sh` | one-time server setup: `brain` user, bare repo, GitHub mirror. Run before `setup-bot.sh` |
 | `setup-bot.sh` | bot installer / updater, run with `sudo bash setup-bot.sh` |
@@ -38,21 +43,22 @@ Installed locations (owned by user `brain`, not readable by your admin user with
 
 | Path | What |
 |---|---|
-| `/home/brain/bot/bot.py` | running copy, overwritten by `setup-bot.sh` |
+| `/home/brain/bot/bot.py`, `titles.py` | running copy, overwritten by `setup-bot.sh` |
 | `/home/brain/vault` | bot's working clone of the vault |
 | `/home/brain/brain.git` | central bare repo (origin of the PC and of the bot); `post-receive` → `~/bin/mirror.sh` |
 | `/home/brain/mirror.log` | GitHub mirror results |
 | `/home/brain/.brain-bot-offset` | last processed Telegram `update_id` |
-| `/etc/brain-bot.env` | `BRAIN_BOT_TOKEN`, `BRAIN_BOT_ALLOWED_USER_ID` (mode 600) |
+| `/etc/brain-bot.env` | `BRAIN_BOT_TOKEN`, `BRAIN_BOT_ALLOWED_USER_ID`, optional `ANTHROPIC_API_KEY` (mode 600) |
 | `/etc/systemd/system/brain-bot.service` | installed unit |
 
-Environment variables: `BRAIN_BOT_TOKEN` (required), `BRAIN_BOT_ALLOWED_USER_ID` (if empty, the bot only replies with the sender's id), `BRAIN_VAULT` (default `~/vault`), `BRAIN_BARE_REPO` (default `~/brain.git`, used by `/cerca`), `BRAIN_TZ` (default `Europe/Rome`).
+Environment variables: `BRAIN_BOT_TOKEN` (required), `BRAIN_BOT_ALLOWED_USER_ID` (if empty, the bot only replies with the sender's id), `BRAIN_VAULT` (default `~/vault`), `BRAIN_BARE_REPO` (default `~/brain.git`, used by `/cerca`), `BRAIN_TZ` (default `Europe/Rome`), `ANTHROPIC_API_KEY` (optional, enables note titles).
 
 ## Hard constraints
 
 - **Public repo**: never commit tokens, user ids, hostnames, vault content or other personal data — not in code, docs, tests or examples. Test fixtures use made-up notes.
 - **Python standard library only** (Python ≥ 3.10). No pip, no venv, no third-party packages.
-- **Never log or echo the token.** The API URL contains it: do not log URLs or raw urllib exceptions that could include them.
+- **Never log or echo the token or the Anthropic API key.** The Telegram API URL contains the token and the Claude request headers contain the key: do not log URLs, headers or raw urllib exceptions that could include them. Do not log note content either.
+- **Third-party calls are opt-in and never block a capture.** Claude is only called for the authorized user's messages, only with `ANTHROPIC_API_KEY` set; any failure falls back to the date-only name. Tests must never reach the real API (`tests/test_bot.py` unsets the key and fakes `urlopen`).
 - **Only the authorized user, only private chats.** Everything else is ignored (logged as a warning, no reply).
 - **The bot only adds files under `inbox/`.** It never modifies or deletes existing notes. This is what keeps it conflict-free with the PC.
 - **Never force push, never rewrite history.** The bare repo rejects it anyway (`receive.denyNonFastForwards`, `receive.denyDeletes`).
@@ -80,9 +86,10 @@ and refuses to run if the bare repo has no `main` yet (the vault must be pushed 
 
 ## Testing
 
-`tests/test_bot.py` (stdlib `unittest`, temp repos, no network) covers `/cerca` and the reply parameters:
-`python3 -m unittest discover -s tests -v`. It sets `BRAIN_BARE_REPO` to a temp bare repo and replaces `bot.reply`/`bot.tg`.
-Capture is still tested ad hoc — to be moved into the suite. The approach used so far:
+`tests/test_bot.py` (stdlib `unittest`, temp repos, no network): `python3 -m unittest discover -s tests -v`.
+Covers `/cerca`, reply parameters, capture with/without titles (text, link, photo, album) and `titles.py` (fake `urlopen`).
+It sets `BRAIN_BARE_REPO`/`BRAIN_VAULT` to temp repos and replaces `bot.reply`/`bot.tg`/`bot.download`/`titles.*`.
+The older ad-hoc capture cases below are not all in the suite yet. The approach used so far:
 - Import `bot` with fake env vars (`BRAIN_BOT_TOKEN=x`, `BRAIN_BOT_ALLOWED_USER_ID=42`, `BRAIN_VAULT=<tmp clone>`).
 - Monkeypatch `bot.reply` (collect sent texts) and `bot.download` (write a dummy file).
 - Create a temp bare repo + a "PC" clone + the bot clone; feed `bot.handle()` fake message dicts.

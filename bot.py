@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-brain-bot — cattura veloce da Telegram nell'inbox del second brain.
+brain-bot — quick capture from Telegram into the second brain's inbox.
 
-Ogni messaggio (testo, link, foto, documenti, inoltri) diventa un file
-Markdown in inbox/ del vault. Poi commit + push sul repo bare locale, che
-a sua volta fa il mirror su GitHub (hook post-receive).
+Every message (text, links, photos, documents, forwards) becomes a Markdown
+file in the vault's inbox/, then commit + push to the local bare repo, which
+mirrors to GitHub (post-receive hook).
 
-Solo libreria standard: niente pip, niente venv.
-Configurazione via variabili d'ambiente (le mette systemd da /etc/brain-bot.env):
-  BRAIN_BOT_TOKEN            token di @BotFather (obbligatorio)
-  BRAIN_BOT_ALLOWED_USER_ID  il tuo user id Telegram; se vuoto il bot te lo dice
-  BRAIN_VAULT                clone di lavoro del bot (default ~/vault)
-  BRAIN_BARE_REPO            repo bare centrale, usato da /cerca (default ~/brain.git)
-  BRAIN_TZ                   fuso orario per i nomi file (default Europe/Rome)
+Standard library only: no pip, no venv.
+Configuration via environment variables (systemd loads /etc/brain-bot.env):
+  BRAIN_BOT_TOKEN            token from @BotFather (required)
+  BRAIN_BOT_ALLOWED_USER_ID  your Telegram user id; if empty the bot tells you
+  BRAIN_VAULT                the bot's working clone (default ~/vault)
+  BRAIN_BARE_REPO            central bare repo, used by /cerca (default ~/brain.git)
+  BRAIN_TZ                   time zone for file names (default Europe/Rome)
+  ANTHROPIC_API_KEY          optional: note titles from Claude Haiku (see titles.py)
 """
 import json
 import logging
@@ -26,6 +27,8 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+import titles
 
 TOKEN = os.environ["BRAIN_BOT_TOKEN"]
 ALLOWED_USER_ID = int(os.environ.get("BRAIN_BOT_ALLOWED_USER_ID") or 0)
@@ -216,8 +219,11 @@ def forward_source(msg: dict) -> str | None:
     return None
 
 
-def frontmatter(dt: datetime, fwd: str | None) -> str:
-    lines = ["---", f"created: {dt:%Y-%m-%dT%H:%M}", "source: telegram"]
+def frontmatter(dt: datetime, fwd: str | None, title: str | None = None) -> str:
+    lines = ["---"]
+    if title:
+        lines.append(f"title: {json.dumps(title, ensure_ascii=False)}")
+    lines += [f"created: {dt:%Y-%m-%dT%H:%M}", "source: telegram"]
     if fwd:
         lines.append(f"forwarded_from: {json.dumps(fwd, ensure_ascii=False)}")
     return "\n".join(lines + ["---", "", ""])
@@ -236,6 +242,19 @@ def parse_command(text: str | None) -> tuple[str, str] | None:
         return None
     head, *rest = text.split(maxsplit=1)
     return head.split("@", 1)[0], (rest[0] if rest else "").strip()
+
+
+def note_title(msg: dict, text: str, saved: Path | None) -> str | None:
+    """Title from Claude Haiku (titles.py), or None: then the note keeps the date-only name."""
+    if not titles.enabled():
+        return None
+    url = titles.first_url(text)
+    page = titles.page_title(url) if url else None
+    content = text
+    if "document" in msg and msg["document"].get("file_name"):
+        content = f"File: {msg['document']['file_name']}\n{text}".strip()
+    image = saved if "photo" in msg else None
+    return titles.make_title(content, image, page)
 
 
 def handle(msg: dict) -> None:
@@ -289,7 +308,7 @@ def handle(msg: dict) -> None:
     pull()
     ATTACH.mkdir(parents=True, exist_ok=True)
 
-    body = []
+    body, saved = [], None
     if attachment:
         saved = download(attachment[0], ATTACH, stem, attachment[1])
         body.append(f"![[{saved.name}]]")
@@ -297,19 +316,23 @@ def handle(msg: dict) -> None:
         body.append(text)
 
     group = msg.get("media_group_id")
-    if group and group in album_notes and album_notes[group].exists():
-        # foto successiva dello stesso album: aggiungila alla nota esistente
+    in_album = bool(group and group in album_notes and album_notes[group].exists())
+    # album: only the first message names the note
+    title = None if in_album else note_title(msg, text, saved)
+    if in_album:
+        # next photo of the same album: append it to the existing note
         note = album_notes[group]
         with open(note, "a", encoding="utf-8") as f:
             f.write("\n" + "\n\n".join(body) + "\n")
     else:
-        note = unique_path(INBOX, stem, ".md")
-        note.write_text(frontmatter(dt, forward_source(msg)) + "\n\n".join(body) + "\n",
+        slug = titles.slugify(title) if title else ""
+        note = unique_path(INBOX, f"{stem}-{slug}" if slug else stem, ".md")
+        note.write_text(frontmatter(dt, forward_source(msg), title) + "\n\n".join(body) + "\n",
                         encoding="utf-8")
         if group:
             album_notes[group] = note
 
-    first_line = (text.splitlines() or ["allegato"])[0][:60]
+    first_line = title or (text.splitlines() or ["allegato"])[0][:60]
     commit_and_push(f"inbox: {first_line}")
     # no ".md" in the reply: Telegram would turn the file name into a link (.md = Moldova TLD)
     reply(chat_id, f"✅ {note.relative_to(VAULT).with_suffix('')}", msg_id)

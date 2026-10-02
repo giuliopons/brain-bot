@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installa brain-bot sul server (dopo setup-server.sh).
 # Uso:  sudo bash setup-bot.sh
-# Rilanciabile: aggiorna bot.py e il servizio, non tocca token né vault.
+# Rilanciabile: aggiorna bot.py, titles.py e il servizio, non tocca token né vault.
 set -euo pipefail
 
 U=brain
@@ -20,6 +20,7 @@ python3 -c 'import sys; assert sys.version_info >= (3, 10)' || { echo "Serve Pyt
 # 1. Codice
 install -d -o root -g "$U" -m 750 "$H/bot"
 install -o root -g "$U" -m 640 "$DIR/bot.py" "$H/bot/bot.py"
+install -o root -g "$U" -m 640 "$DIR/titles.py" "$H/bot/titles.py"
 
 # 2. Clone di lavoro del bot (scrive qui, poi push sul repo bare)
 [ -d "$H/vault/.git" ] || as_brain git clone -q "$H/brain.git" "$H/vault"
@@ -31,7 +32,8 @@ as_brain git -C "$H/vault" config pull.rebase true
 if [ ! -f "$ENV" ]; then
   read -rsp "Token del bot (da @BotFather): " TOKEN; echo
   install -m 600 -o "$U" -g "$U" /dev/null "$ENV"
-  printf 'BRAIN_BOT_TOKEN=%s\nBRAIN_BOT_ALLOWED_USER_ID=\n' "$TOKEN" > "$ENV"
+  # optional key for note titles (docs/installazione.md): uncomment and fill in
+  printf 'BRAIN_BOT_TOKEN=%s\nBRAIN_BOT_ALLOWED_USER_ID=\n#ANTHROPIC_API_KEY=\n' "$TOKEN" > "$ENV"
 fi
 
 # 4. Servizio systemd

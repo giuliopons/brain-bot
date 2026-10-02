@@ -14,6 +14,7 @@ Questa guida porta da zero a un bot funzionante: crei il bot su Telegram, prepar
 | PC | push del vault sul server | 5 |
 | Server | `setup-bot.sh`: installa e avvia il bot | 6 |
 | Telegram | scopri il tuo user id e autorizzi solo te | 7 |
+| Anthropic | *facoltativo*: chiave API per i titoli automatici delle note | 9 |
 
 Nei comandi:
 - `<server>` è il nome o l'IP del server nella tua rete, per esempio `minipc.local` o `192.168.1.20`;
@@ -180,6 +181,32 @@ Da adesso il bot risponde solo a te, e solo in chat privata.
 2. Sul PC fai `git pull`: la nota è in `inbox/`.
 3. Manda `/cerca prova`: il bot ti mostra la nota appena creata.
 
+## 9. Titoli automatici con Claude (facoltativo)
+
+Senza questo passo le note si chiamano con la sola data e ora (`2026-10-02-153012.md`). Con una chiave API di Anthropic, il bot chiede a Claude Haiku un titolo breve e lo aggiunge al nome (`2026-10-02-153012-ricetta-pane-lievito-madre.md`) e al frontmatter (`title:`).
+
+Cosa viene inviato ad Anthropic: il testo che mandi, le foto e, per i link, il titolo della pagina, che il server legge scaricando i primi KB. Solo per i messaggi tuoi: quelli degli altri il bot li ignora prima di arrivare a questo punto.
+
+1. Crea un account su [console.anthropic.com](https://console.anthropic.com), aggiungi un metodo di pagamento e crea una **API key** (Settings → API keys).
+   Consigliato: in Settings → Limits imposta un **limite di spesa mensile** basso, per esempio 5 dollari. Un messaggio di testo costa meno di un decimo di centesimo, una foto circa due decimi.
+2. Sul server, aggiungi la chiave al file di configurazione:
+   ```bash
+   sudo nano /etc/brain-bot.env
+   ```
+   ```
+   ANTHROPIC_API_KEY=sk-ant-…
+   ```
+   Se c'è già la riga `#ANTHROPIC_API_KEY=`, togli il `#` e incolla la chiave dopo l'`=`.
+3. Aggiorna e riavvia (serve `titles.py`, che `setup-bot.sh` installa insieme al bot):
+   ```bash
+   cd ~/brain-bot && git pull && sudo bash setup-bot.sh
+   ```
+4. Prova: manda `ricetta del pane con lievito madre`. La risposta deve essere tipo `✅ inbox/2026-10-02-153012-ricetta-pane-lievito-madre`.
+
+Per disattivarli, togli la riga (o rimettici il `#` davanti) e fai `sudo systemctl restart brain-bot`.
+
+> ⚠️ La chiave API è come il token del bot: non incollarla in chat, in un'issue o in un file dentro una repo. Se trapela, revocala dalla console di Anthropic e creane una nuova.
+
 ## Uso quotidiano dal PC
 
 - Prima di lavorare sul vault fai `git pull`, dopo fai commit e `git push`. In Obsidian lo può fare in automatico il plugin *Obsidian Git*.
@@ -223,6 +250,14 @@ sudo systemctl daemon-reload
 - `HTTP 409 Conflict`: un'altra copia del bot sta usando lo stesso token, per esempio una prova lasciata accesa sul PC. Fermala;
 - `ignorato messaggio da user id …`: l'id in `/etc/brain-bot.env` non è il tuo. Ricontrolla il passo 7;
 - nessun log: il servizio è fermo. Prova `sudo systemctl restart brain-bot` e poi `systemctl status brain-bot`.
+
+**Le note non prendono il titolo** (nome con la sola data). Guarda `journalctl -u brain-bot -n 50 | grep titolo`:
+- `titolo: Claude HTTP 401 …`: la chiave API è sbagliata o revocata;
+- `titolo: Claude HTTP 400 …` che parla di credito: hai finito il credito o raggiunto il limite di spesa;
+- `titolo: Claude non raggiungibile`: problema di rete o API lenta. Riprova più tardi;
+- nessuna riga `titolo`: la chiave non è in `/etc/brain-bot.env`, oppure il bot non è stato riavviato dopo averla aggiunta.
+
+La nota viene comunque salvata con la sola data: non si perde niente.
 
 **Il bot risponde ❌ con un errore git.** Controlla lo stato del clone del bot:
 

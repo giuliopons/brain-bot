@@ -26,16 +26,21 @@ Vedi un link, ti viene un'idea, fotografi una lavagna: lo mandi al bot dal telef
 | messaggi inoltrati | la nota riporta da chi arriva (`forwarded_from`) |
 | `/cerca parola` | le note che contengono quella parola, con le righe trovate |
 
+**Titoli automatici (facoltativi).** Se configuri una chiave API di Anthropic, il bot chiede a Claude Haiku un titolo breve per ogni cattura e lo usa nel nome del file: `inbox/2026-10-02-153012-ricetta-pane-lievito-madre.md` invece di `inbox/2026-10-02-153012.md`. Così, quando riordini l'inbox, capisci cosa c'è senza aprire ogni nota. Il titolo tiene conto del testo, del titolo della pagina se mandi un link e del contenuto delle foto. Senza chiave, o se Claude non risponde, la nota prende il nome con la sola data e niente si perde.
+
 Ogni nota ha un piccolo frontmatter:
 
 ```markdown
 ---
+title: "Ricetta pane con lievito madre"
 created: 2026-10-02T15:30
 source: telegram
 ---
 
 Il testo che hai mandato
 ```
+
+La riga `title` c'è solo con i titoli automatici attivi.
 
 Il bot risponde ✅ con il nome della nota (senza `.md`, così Telegram non lo trasforma in un link), o ❌ con l'errore.
 
@@ -51,6 +56,7 @@ Questa repo contiene **solo il codice** del bot, ed è pubblica. Il tuo vault è
 - Gira come utente dedicato `brain`, chiuso in una **sandbox systemd**: vede e scrive solo `/home/brain` e ha la memoria limitata a 150 MB.
 - Il token del bot sta in `/etc/brain-bot.env` (leggibile solo da `brain`) e non finisce mai nei log.
 - Telegram **non** cifra end-to-end le chat con i bot: quello che mandi passa dai server di Telegram. Tienine conto per i contenuti sensibili.
+- Con i **titoli automatici** attivi, il testo che mandi, le foto e i titoli delle pagine linkate vengono inviati anche ad **Anthropic** (l'API di Claude) per generare il titolo. Per i link, il server scarica i primi KB della pagina per leggerne il titolo. Senza chiave API non parte nessuna di queste richieste. Costo indicativo (Claude Haiku 4.5): meno di un decimo di centesimo di dollaro per un messaggio di testo, circa due decimi di centesimo con una foto.
 
 ## Requisiti
 

@@ -157,6 +157,20 @@ journalctl -u brain-bot-remind -n 20
 
 ---
 
+## 3. ✅ DONE — note titles from Claude Haiku
+
+Implemented in `titles.py` (imported by `bot.py`), see `CLAUDE.md` → How it works. Owner's choices: file name = date + slug,
+`title:` in the frontmatter, Claude sees text + linked page title + photos. Opt-in via `ANTHROPIC_API_KEY`.
+
+To do by hand: create the API key (with a spend limit), add it to `/etc/brain-bot.env`, `sudo bash setup-bot.sh`, try text / link / photo.
+
+Possible follow-ups:
+- a one-sentence `summary:` in the frontmatter (same call, structured output with two fields);
+- titles for images sent as documents, and for PDFs (document blocks);
+- suggest a destination folder for the note (would help the weekly review, see §2).
+
+---
+
 ## Also worth doing (small)
 
 - Publish: the repo is ready for a public GitHub remote (README, LICENSE, install guide, personal data removed). Not pushed yet.
